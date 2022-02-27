@@ -1,0 +1,122 @@
+3d转2d，标准化就是将图像的三维坐标在(-1，1)内处理为二维
+大体步骤：只有VAO和VBO
+// 0. 复制顶点数组到缓冲中供OpenGL使用
+glBindBuffer(GL_ARRAY_BUFFER, VBO);
+glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+// 1. 设置顶点属性指针
+glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+glEnableVertexAttribArray(0);
+// 2. 当我们渲染一个物体时要使用着色器程序
+glUseProgram(shaderProgram);
+// 3. 绘制物体
+someOpenGLFunctionThatDrawsOurTriangle();
+VBO,VAO,EBO
+// ..:: 初始化代码 :: ..
+// 1. 绑定顶点数组对象
+glBindVertexArray(VAO);
+// 2. 把我们的顶点数组复制到一个顶点缓冲中，供OpenGL使用
+glBindBuffer(GL_ARRAY_BUFFER, VBO);
+glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+// 3. 复制我们的索引数组到一个索引缓冲中，供OpenGL使用
+glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+// 4. 设定顶点属性指针
+glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+glEnableVertexAttribArray(0);
+
+[...]
+
+// ..:: 绘制代码（渲染循环中） :: ..
+glUseProgram(shaderProgram);
+glBindVertexArray(VAO);
+glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0)
+glBindVertexArray(0);
+VBO--顶点缓冲对象，由一个个四维变量三位空间坐标组合的数据块
+	glGenBuffer(number,&VBO)-生存VBO这个对象
+	GL_ARRAY_BUFFER---顶点缓冲对象的缓冲类型(允许同时绑定多个不同类型的缓冲)
+	glBindBuffer(GL_ARRAY_BUFFER, VBO)---绑定
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW)--定义绑定缓冲函数的数据
+   (目标缓冲的类型,数据的大小,实际数据,数据形式(GL_STATIC_DRAW-不变,GL_DYNAMIC_DRAW-会变,GL_STREAM_DRAW-每次会变))
+	
+	至少一个顶点和一个片段着色器
+	#version 330 core //GLSL顶点着色器,3.3版本
+	layout (location = 0) in vec3 aPos;//输入变量的位置，此处为0，方便VBO数组
+	void main(){gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);}//四维变量的三位空间坐标系
+	
+	const char *vertexShaderSource = "#version 330 core\n"
+    	"layout (location = 0) in vec3 aPos;\n"
+  	  "void main()\n"
+  	  "{\n"
+  	  "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
+  	  "}\0";//顶点着色器的源代码上段的完整版
+
+	//顶点着色器创建
+	unsigned int vertexShader;
+         vertexShader = glCreateShader(GL_VERTEX_SHADER);//创建一个名为vertexShader着色器,GL_VERTEX_SHADER为着色器类型
+      glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);//将源码附加到着色器vertexShader上，中间数字指定传递的源码字符串数量
+      glCompileShader(vertexShader);//检测是否成功
+
+	FragColor片段着色器(颜色输出)
+	#version 330 core
+	out vec4 FragColor;
+
+	void main()
+	{FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);} //三元素+透明度 也是个四维变量
+	//片段着色器创建与上文顶点着色器创建类似
+	unsigned int fragmentShader;
+	fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);//GL_FRAGMENT_SHADER为着色器类型
+	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+	glCompileShader(fragmentShader);
+ 
+	unsigned int shaderProgram;
+	shaderProgram = glCreateProgram();//创建程序对象
+
+	glAttachShader(shaderProgram, vertexShader);//程序对象附加顶点着色器
+	glAttachShader(shaderProgram, fragmentShader);//程序对象附加片段着色器
+	glLinkProgram(shaderProgram);//链接
+	glUseProgram(shaderProgram);//激活使用
+	//链接成功后即可删除着色器对象
+	glDeleteShader(vertexShader);//删除顶点着色器对象
+	glDeleteShader(fragmentShader);//删除片段着色器对象
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);//解析顶点属性
+	(位置值,大小/维数,数据的类型,是否标准化,步长,偏移量)//告诉系统如何去VBO数组取顶点
+	glEnableVertexAttribArray(0);//启用顶点属性(0-上文的顶点位置为0)
+VAO---顶点数组对象(可理解为包含不同顶点数据和属性配置的顶点结构体数组)
+  要素包含--glEnableVertexAttribArray和glDisableVertexAttribArray的调用。
+	--通过glVertexAttribPointer设置的顶点属性配置。
+	--通过glVertexAttribPointer调用与顶点属性关联的顶点缓冲对象。
+
+  绑定步骤
+	// ..:: 初始化代码（只运行一次 (除非你的物体频繁改变)） :: ..
+	// 1. 绑定VAO
+	glBindVertexArray(VAO);
+	// 2. 把顶点数组复制到缓冲中供OpenGL使用
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	// 3. 设置顶点属性指针
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	[...]
+	// ..:: 绘制代码（渲染循环中） :: ..
+	// 4. 绘制物体
+	glUseProgram(shaderProgram);
+	glBindVertexArray(VAO);
+	someOpenGLFunctionThatDrawsOurTriangle();
+
+	glUseProgram(shaderProgram);//激活使用
+	glBindVertexArray(VAO);//绑定VAO
+glDrawArrays(GL_TRIANGLES, 0, 3);//(类型,起始索引地址,绘制的顶点数)
+
+IBO/EBO---索引缓冲对象(视为存储不同顶点的数组便于拿点绘图减少重复点的设立)
+	unsigned int EBO;
+	glGenBuffers(1, &EBO);
+	//类似于VBO的创建
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);//区别于glDrawArrays，指明从索引缓冲渲染
+	（绘制模式,定点数,索引类型）
+ps:当目标是GL_ELEMENT_ARRAY_BUFFER的时候，VAO会储存glBindBuffer的函数调用。
+这也意味着它也会储存解绑调用，所以确保你没有在解绑VAO之前解绑索引数组缓冲，否则它就没有这个EBO配置了。
