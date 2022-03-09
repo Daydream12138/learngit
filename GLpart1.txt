@@ -80,7 +80,7 @@ VBO--顶点缓冲对象，由一个个四维变量三位空间坐标组合的数
 	glDeleteShader(fragmentShader);//删除片段着色器对象
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);//解析顶点属性
-	(位置值,大小/维数,数据的类型,是否标准化,步长,偏移量)//告诉系统如何去VBO数组取顶点
+ (位置值,大小/维数,数据的类型,是否标准化,步长,偏移量)//告诉系统如何去VBO数组取顶点	    偏移量=区别颜色属性和顶点属性
 	glEnableVertexAttribArray(0);//启用顶点属性(0-上文的顶点位置为0)
 VAO---顶点数组对象(可理解为包含不同顶点数据和属性配置的顶点结构体数组)
   要素包含--glEnableVertexAttribArray和glDisableVertexAttribArray的调用。
