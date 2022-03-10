@@ -1,0 +1,122 @@
+纹理
+GL_REPEAT	对纹理的默认行为。重复纹理图像。
+GL_MIRRORED_REPEAT	和GL_REPEAT一样，但每次重复图片是镜像放置的。
+GL_CLAMP_TO_EDGE	纹理坐标会被约束在0到1之间，超出的部分会重复纹理坐标的边缘，产生一种边缘被拉伸的效果。
+GL_CLAMP_TO_BORDER	超出的坐标为用户指定的边缘颜色。
+用法
+glTexParameter*函数对单独的一个坐标轴设置（s、t（如果是使用3D纹理那么还有一个r）它们和x、y、z是等价的）
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+glTexParameteri(纹理目标(3d?2d?), 指定坐标,环绕方式);
+如果是指定颜色那种则
+float borderColor[] = { 1.0f, 1.0f, 0.0f, 1.0f };
+glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+纹理过滤
+GL_NEAREST	邻近过滤-中心点最接近纹理坐标的那个像素---颗粒状
+GL_LINEAR	线性过滤-邻近像素的混合色---更平滑
+使用glTexParameter*函数为放大(Magnify)和缩小(Minify)指定过滤方式.类似纹理环绕设置：
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+多级渐远纹理：后一个纹理图像是前一个的二分之一(解决远近纹理精细度的消耗)
+GL_NEAREST_MIPMAP_NEAREST	使用最邻近的多级渐远纹理来匹配像素大小，并使用邻近插值进行纹理采样
+GL_LINEAR_MIPMAP_NEAREST	使用最邻近的多级渐远纹理级别，并使用线性插值进行采样
+GL_NEAREST_MIPMAP_LINEAR	在两个最匹配像素大小的多级渐远纹理之间进行线性插值，使用邻近插值进行采样
+GL_LINEAR_MIPMAP_LINEAR	在两个邻近的多级渐远纹理之间使用线性插值，并使用线性插值进行采样
+用法类似于纹理过滤,但是注意多级渐远纹理主要是使用在纹理被缩小的情况下的!!!
+纹理放大不会使用多级渐远纹理，为放大过滤设置多级渐远纹理的选项会产生一个GL_INVALID_ENUM错误代码。
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+导入图片
+#define STB_IMAGE_IMPLEMENTATION
+//预处理器会修改头文件，让其只包含相关的函数定义源码，等于是将这个头文件变为一个 .cpp 文件了
+#include "stb_image.h"
+int width, height, nrChannels;
+unsigned char *data = stbi_load("container.jpg", &width, &height, &nrChannels, 0);
+//(图片位置,宽度,高度,颜色通道的个数)
+生成——ID引用
+unsigned int texture;
+glGenTextures(1, &texture);//数字代表生成数量,后面是生成对象名字
+glBindTexture(GL_TEXTURE_2D, texture);//类型，绑定对象
+glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+(纹理目标,多级渐远纹理的级别,储存何种格式,宽度,高度,0,源图的格式,数据类型,图像数据)
+glGenerateMipmap(GL_TEXTURE_2D);//当前绑定的纹理自动生成所有需要的多级渐远纹理
+stbi_image_free(data);//释放图像的内存
+
+
+glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+glEnableVertexAttribArray(2);
+顶点输出到片段
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+layout (location = 2) in vec2 aTexCoord;
+
+out vec3 ourColor;
+out vec2 TexCoord;
+
+void main()
+{
+    gl_Position = vec4(aPos, 1.0);
+    ourColor = aColor;
+    TexCoord = aTexCoord;
+}
+片段接受
+#version 330 core
+out vec4 FragColor;
+
+in vec3 ourColor;
+in vec2 TexCoord;
+
+uniform sampler2D ourTexture;
+
+void main()
+{
+    FragColor = texture(ourTexture, TexCoord);
+}
+
+glBindTexture(GL_TEXTURE_2D, texture);//绑定
+glBindVertexArray(VAO);//绑定
+glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+纹理单元---变量为uniform,用glUniformli，可以让着色器用多个纹理单元
+glActiveTexture(GL_TEXTURE0); // 在绑定纹理之前先激活纹理单元
+glBindTexture(GL_TEXTURE_2D, texture);//纹理单元GL_TEXTURE0默认总是被激活
+纹理绑定到对应的纹理单元并定义
+
+ourShader.use(); // 不要忘记在设置uniform变量之前激活着色器程序！
+glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"), 0); // 手动设置
+glUniform1i设置每个采样器的方式告诉OpenGL每个着色器采样器属于哪个纹理单元
+ourShader.setInt("texture2", 1); // 或者使用着色器类设置
+
+while(...) 
+{
+    [...]
+}
+
+mix(texture(texture1, TexCoord), texture(texture2, TexCoord), 0.2)
+GLSL内建的mix函数需要接受两个值作为参数，并对它们根据第三个参数进行线性插值。
+如果第三个值是0.0，它会返回第一个输入；如果是1.0，会返回第二个输入值。0.2会返回80%的第一个输入颜色和20%的第二个输入颜色
+
+因为y轴0.0坐标是在图片的底部的，但是图片的y轴0.0坐标通常在顶部
+stbi_set_flip_vertically_on_load(true);
+
+大体步骤:
+unsigned int texture;
+glGenTextures(1, &texture);
+glBindTexture(GL_TEXTURE_2D, texture);
+// 为当前绑定的纹理对象设置环绕、过滤方式
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);   
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+// 加载并生成纹理
+int width, height, nrChannels;
+unsigned char *data = stbi_load("container.jpg", &width, &height, &nrChannels, 0);
+if (data)
+{
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+}
+else
+{
+    std::cout << "Failed to load texture" << std::endl;
+}
+stbi_image_free(data);
